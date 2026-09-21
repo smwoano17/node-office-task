@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import http from 'http';
-import authRoutes from './routes/authRoutes.js';
+import webRoutes from './routes/webRoute.js';
 
 dotenv.config();
 
@@ -27,7 +27,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api', authRoutes);
+app.use('/api', webRoutes);
 
 // Socket connection
 io.on('connection', (socket) => {
@@ -46,6 +46,13 @@ app.get('/', (req, res) => {
         success: true,
         message: 'API is running'
     });
+});
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`
+  });
 });
 
 

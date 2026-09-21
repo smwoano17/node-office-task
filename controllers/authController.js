@@ -166,10 +166,63 @@ export const login = async (req, res) => {
             }
         );
 
+        const [userRole] = await pool.execute(
+            `select role_id from users where id = ?`,
+            [user.id]
+        );
+
+        const [allMenus] = await pool.execute(
+            `SELECT menus.id, menus.parent_id, menus.title, menus.icon, menus.front_route, roles.id as role_id FROM menus
+            LEFT JOIN menu_permissions ON menu_permissions.menu_id = menus.id
+            LEFT JOIN permissions ON permissions.id = menu_permissions.permission_id
+            LEFT JOIN role_permissions ON role_permissions.permission_id = permissions.id
+            LEFT JOIN roles ON roles.id = role_permissions.role_id
+            WHERE (roles.id = ? OR menus.route IS NULL) AND menus.is_active = ?
+            ORDER BY menus.parent_id, menus.sort_order`,
+            [userRole[0].role_id, 1]
+        );
+
+        const menuTree = [];
+        for (const allMenu of allMenus) {
+            if (allMenu.parent_id == null) {
+                menuTree.push({
+                    id: allMenu.id,
+                    title: allMenu.title,
+                    icon: allMenu.icon,
+                    is_route: (allMenu.front_route) ? true : false,
+                    route: (allMenu.front_route) ? allMenu.front_route : '',
+                    sub_menu: []
+                });
+            }
+        }
+
+        for (const allMenu of allMenus) {
+            if (allMenu.parent_id !== null) {
+                const parent = menuTree.find(
+                    item => item.id === allMenu.parent_id
+                );
+
+                if (parent) {
+                    parent.sub_menu.push({
+                        id: allMenu.id,
+                        title: allMenu.title,
+                        route: (allMenu.front_route) ? allMenu.front_route : '',
+                    });
+                }
+            }
+        }
+
+        const filteredMenuTree = menuTree.filter(
+            menu =>
+                menu.sub_menu.length > 0 ||
+                menu.is_route === true
+        );
+
         res.json({
             success: true,
             message: 'Login successful',
             token: token,
+            menu: filteredMenuTree,
             user: {
                 id: user.id,
                 name: user.name,
